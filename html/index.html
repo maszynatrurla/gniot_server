@@ -1,0 +1,243 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>gnIOT</title>
+</head>
+<body>
+
+    <div>
+    
+    <div style="float:left">
+    <h1>Aktualne warunki</h1>
+    
+    <canvas id="tak" width="800" height="600">
+        
+    </canvas>
+    </div>
+    
+    <div style="float:left">
+    <h1>Ostatnie 8 godzin</h1>
+    
+    <h2>Temperatura [°C]</h2>
+    <canvas id="czort" width="800", height="480">
+    </canvas>
+    
+    <h2>Wilgotność względna [%]</h2>
+    <canvas id="mokr" width="800", height="480">
+    </canvas>
+    
+    </div>
+    </div>
+    
+    <img style="display:none" src="nora.png" id="telo">
+
+    <div id="debugczort"></div>
+</body>
+
+<script src="chartjs/dist/Chart.js"></script>
+<script type="text/javascript">
+
+GXY = {
+    1 : {"x" : 277, "y" : 277, "font" : "30px Arial", "dy" : 32},
+    2 : {"x" : 323, "y" : 396, "font" : "20px Arial", "dy" : 22},
+    3 : {"x" : 105, "y" : 420, "font" : "30px Arial", "dy" : 32},
+    4 : {"x" : 128, "y" : 125, "font" : "30px Arial", "dy" : 32}
+}
+
+function dtos(date)
+{
+    hs = "" + date.getHours()
+    mi = "" + date.getMinutes()
+    if (hs.length == 1) hs = "0" + hs
+    if (mi.length == 1) mi = "0" + mi
+    return hs+":"+mi
+}
+
+function grafuj(text)
+{
+    gp = JSON.parse(text);
+    tlen = (gp.tmax - gp.tmin);
+    if (tlen == 0) return;
+    
+    labels = [];
+    temp = {1:[], 2:[], 3:[], 4:[]};
+    hum = {1:[], 2:[], 3:[], 4:[]};
+    
+    var ii = 0;
+    for (var i = gp.tmin; i < gp.tmax; i += 600)
+    {
+        var d = new Date(0)
+        d.setUTCSeconds(i)
+        labels.push(dtos(d))
+        for (var g = 1; g < 5; ++g)
+        {
+            for (var ti = 0; ti < gp[g].t.length; ++ti)
+            {
+                if (gp[g].t[ti] >= i && gp[g].t[ti] < i + 600)
+                {
+                    temp[g].push({x:ii,y:gp[g].T[ti]})
+                    hum[g].push({x:ii,y:gp[g].rh[ti]})
+                }
+            }
+        }
+        ii += 1;
+    }
+    //document.getElementById("debugczort").innerHTML = temp[2][0].x;
+    
+    var ctx = document.getElementById('czort').getContext("2d");
+    var myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels : labels,
+            datasets: [{
+                label: 'regał',
+                backgroundColor: '#fcba03',
+                borderColor: '#fcba03',
+                data: temp[1],
+                fill : false
+            },
+            {
+                label: 'łazienka',
+                backgroundColor: '#5eadbd',
+                borderColor: '#5eadbd',
+                data: temp[2],
+                fill : false
+            },
+            {
+                label: 'sypialnia',
+                backgroundColor: '#7fdb76',
+                borderColor: '#7fdb76',
+                data: temp[3],
+                fill : false
+            },
+            {
+                label: 'parapet',
+                backgroundColor: '#6c5396',
+                borderColor: '#6c5396',
+                data: temp[4],
+                fill : false
+            }]
+        },
+        options : {
+            responsive : false
+        }
+    });
+    
+    var ctx = document.getElementById('mokr').getContext("2d");
+    var myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels : labels,
+            datasets: [{
+                label: 'regał',
+                backgroundColor: '#fcba0320',
+                borderColor: '#fcba03',
+                data: hum[1],
+            },
+            {
+                label: 'łazienka',
+                backgroundColor: '#5eadbd20',
+                borderColor: '#5eadbd',
+                data: hum[2],
+            },
+            {
+                label: 'sypialnia',
+                backgroundColor: '#7fdb7620',
+                borderColor: '#7fdb76',
+                data: hum[3],
+            },
+            {
+                label: 'parapet',
+                backgroundColor: '#6c539620',
+                borderColor: '#6c5396',
+                data: hum[4],
+            }]
+        },
+        options : {
+            responsive : false
+        }
+    });
+}
+
+function loadGraph() 
+{
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) 
+        {
+            grafuj(this.responseText);
+        }
+    };
+    xhttp.open("GET", "/history?length=480", true);
+    xhttp.send();
+}
+
+
+function loadMeasurements() 
+{
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) 
+        {
+            ciapuj(this.responseText);
+        }
+    };
+    xhttp.open("GET", "/actual", true);
+    xhttp.send();
+}
+
+    
+function ciapuj(text) 
+{
+    var c = document.getElementById("tak");
+    var ctx = c.getContext("2d");
+    var img = document.getElementById("telo");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, 411, 528);
+    ctx.drawImage(img,10,10, 411, 528);
+
+    gnioty = JSON.parse(text)
+    
+    for (var i = 0; i < gnioty.length; ++i) 
+    {
+        x = GXY[gnioty[i].gniot_id].x;
+        y = GXY[gnioty[i].gniot_id].y;
+        dy = GXY[gnioty[i].gniot_id].dy
+        
+        ctx.fillStyle = "#eb802f";
+        ctx.font = GXY[gnioty[i].gniot_id].font;
+        if (gnioty[i].T == undefined) 
+        {
+            txt = "??.?? ° C";
+        }
+        else
+        {
+            txt = "" + gnioty[i].T + "°C";
+        }
+        ctx.fillText(txt, x, y);   
+        ctx.fillStyle = "#4d91ff";
+        if (gnioty[i].RH == undefined)
+        {
+            txt = "??.?? % rh"
+        }
+        else
+        {
+            txt = "" + gnioty[i].RH + "% rh";
+        }
+        ctx.fillText(txt, x, y + dy);   
+
+        var d = new Date(0)
+        d.setUTCSeconds(gnioty[i].ts)
+        ctx.font = "10px Arial"
+        ctx.fillStyle = "#444444"
+        ctx.fillText(dtos(d), x, y + 1.5 * dy)
+    }
+}
+
+setTimeout(loadMeasurements, 1000);
+setInterval(loadMeasurements, 10000);
+setTimeout(loadGraph, 1200);
+    
+</script>
+
+</html>

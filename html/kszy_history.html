@@ -1,0 +1,306 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Kszynka</title>
+    <style>
+        table {
+            border-collapse : collapse;
+            width : 100%;
+        }
+        td {
+            text-align : center;
+        }
+        .thlink:link, .thlink:visited, .thlink:active {
+            color: #cfb327;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+        <a class="thlink" href="/">Aktualne warunki</a>
+    </div>
+    
+    <div>
+    
+    <h2>Zakres danych historycznych</h2>
+    <label for="start-time">Początek:</label>
+
+    <input type="datetime-local" id="start-time"
+       name="start-time">
+       
+    <label for="end-time">Koniec:</label>
+       
+    <input type="datetime-local" id="end-time"
+       name="end-time">
+       
+    <button onclick="loadMeasurements()">Pobierz dane</button>
+
+    </div>
+
+    <div id="nicto" style="display:none">
+    Nic tu nie ma :(
+    </div>
+    
+    
+    <div id="cos" style="display:none">
+    
+        <div id="fykresy" style="display:none">
+        
+            <h2>Temperatura [°C]</h2>
+            <div id="temperaturetu" >
+                    <canvas id="temperature" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Wilgotność względna [%]</h2>
+            <div id="humiditytu" >
+                    <canvas id="humidity" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Ciśnienie atmosferyczne [hPa]</h2>
+            <div id="pressuretu" >
+                    <canvas id="pressure" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Napięcie baterii słonecznej [mV]</h2>
+            <div id="solar_mvtu" >
+                    <canvas id="solar_mv" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Stężenie cząstek zawieszonych PM1.0 [µg/m3]</h2>
+            <div id="pm1_0tu" >
+                    <canvas id="pm1_0" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Stężenie cząstek zawieszonych PM2.5 [µg/m3]</h2>
+            <div id="pm2_5tu" >
+                    <canvas id="pm2_5" width="1024", height="400">
+                    </canvas>
+            </div>
+            
+            <h2>Stężenie cząstek zawieszonych PM10 [µg/m3]</h2>
+            <div id="pm10tu" >
+                    <canvas id="pm10" width="1024", height="400">
+                    </canvas>
+            </div>
+        </div>
+        
+        <div id="histy">
+        
+        </div>
+    <div>
+</body>
+
+
+<script src="chartjs/dist/Chart.js"></script>
+
+<script type="text/javascript">
+
+var terafyk = ""
+
+function dtos(date)
+{
+    hs = "" + date.getHours()
+    mi = "" + date.getMinutes()
+    if (hs.length == 1) hs = "0" + hs
+    if (mi.length == 1) mi = "0" + mi
+    return hs+":"+mi
+}
+
+function ftos(fval, decimalplaces = 1)
+{
+    try 
+    {
+        return fval.toFixed(decimalplaces);
+    }
+    catch (error)
+    {
+        return "-";
+    }
+}
+
+function ciapuj(text) 
+{
+    var gnioty = JSON.parse(text)
+    var txt = "<table>"
+    var start_utc, end_utc;
+    var i;
+    var labels = [];
+    var dziady = {
+        "temperature" : {
+            "color" : "#fcba03",
+            "values" : [],
+        },
+        "humidity" : {
+            "color" : "#1f93ff",
+            "values" : [],
+        },
+        "pressure" : {
+            "color" : "#fa1ee8",
+            "values" : [],
+        },
+        "solar_mv" : {
+            "color" : "#ffec1f",
+            "values" : [],
+        },
+        "pm1_0" : {
+            "color" : "#474747",
+            "values" : [],
+        },
+        "pm2_5" : {
+            "color" : "#474747",
+            "values" : [],
+        },
+        "pm10" : {
+            "color" : "#474747",
+            "values" : [],
+        }
+    };
+    var columns = Object.keys(dziady);
+    
+    txt += "<tr><th>data i czas</th>"
+            + "<th>temperatura [°C]</th>"
+            + "<th>ciśnienie [hPa]</th>"
+            + "<th>wilgotność [%]</th>"
+            + "<th>napięcie baterii sł. [mV]</th>"
+            + "<th>PM1.0 [µg/m3]</th>"
+            + "<th>PM2.5 [µg/m3]</th>"
+            + "<th>PM10 [µg/m3]</th></tr>"
+    
+    for (i = 0; i < gnioty.length; ++i)
+    {
+        txt +="<tr>"
+        txt += "<td>"
+        txt += gnioty[i].localtime
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].temperature)
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].pressure, 2)
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].humidity)
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].solar_mv
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm1_0
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm2_5
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm10
+        txt += "</td>"
+        txt +="</tr>"
+        
+        var d = new Date(0)
+        d.setUTCSeconds(gnioty[i].ts)
+        labels.push(dtos(d))
+        
+        for (j = 0; j < columns.length; ++j)
+        {
+            value = gnioty[i][columns[j]];
+            //if (value != undefined)
+            {
+                dziady[columns[j]].values.push({x:i, y:value});
+            }
+        }
+        
+        if (0 == i)
+        {
+            start_utc = gnioty[i].ts
+        }
+        end_utc = gnioty[i].ts
+    }
+    
+    txt += "</table>"
+    document.getElementById("histy").innerHTML = txt
+    
+    if (start_utc == undefined)
+    {
+        document.getElementById("nicto").style.display="block";
+        document.getElementById("cos").style.display="none";
+    }
+    else
+    {
+        document.getElementById("nicto").style.display="none";
+        document.getElementById("cos").style.display="block";
+    }
+    
+    if (i > 2)
+    {
+        for (j = 0; j < columns.length; ++j)
+        {
+            document.getElementById(columns[j]).remove()
+            document.getElementById(columns[j] + 'tu').innerHTML = "<canvas id=\"" + columns[j] + "\" width=\"1024\", height=\"400\"></canvas>"
+            
+            var ctx = document.getElementById(columns[j]).getContext("2d");
+            ctx.canvas.width  = window.innerWidth - 20;
+            var myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels : labels,
+                    datasets: [{
+                        label: columns[j],
+                        backgroundColor: dziady[columns[j]].color,
+                        borderColor: dziady[columns[j]].color,
+                        data: dziady[columns[j]].values,
+                        fill : false
+                        }]
+                    },
+                    options : {
+                        responsive : false
+                    }
+                });
+        }
+    
+        document.getElementById("fykresy").style.display="block";
+    }
+    else
+    {
+        document.getElementById("fykresy").style.display="none";
+    }
+}
+
+function loadMeasurements()
+{
+    var start = Math.floor(new Date(document.getElementById("start-time").value).valueOf() / 1000);
+    var end = Math.floor(new Date(document.getElementById("end-time").value).valueOf() / 1000);
+
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) 
+        {
+            ciapuj(this.responseText);
+        }
+    };
+    xhttp.open("GET", "/history?start_ts=" + start + "&end_ts=" + end, true);
+    xhttp.send();
+}
+
+function initWidgets() 
+{
+    var dnow = new Date(0), dyes = new Date(0);
+    dnow.setUTCSeconds(Date.now() / 1000);
+    dyes.setUTCSeconds(Date.now() / 1000 - 24*3600);
+    document.getElementById("end-time").value = dnow.getFullYear() + "-" + (dnow.getMonth() + 1).toString().padStart(2, '0')
+            + "-" + dnow.getDate().toString().padStart(2, '0') + "T" + dnow.getHours().toString().padStart(2, '0')
+            + ":" + dnow.getMinutes().toString().padStart(2, '0');
+    document.getElementById("start-time").value = dyes.getFullYear() + "-" + (dyes.getMonth() + 1).toString().padStart(2, '0')
+            + "-" + dyes.getDate().toString().padStart(2, '0') + "T" + dyes.getHours().toString().padStart(2, '0')
+            + ":" + dyes.getMinutes().toString().padStart(2, '0');
+}
+
+setTimeout(initWidgets, 500);
+</script>
+
+</html>

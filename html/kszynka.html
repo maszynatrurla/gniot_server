@@ -1,0 +1,429 @@
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>Kszynka</title>
+    <style>
+        table {
+            border-collapse : collapse;
+            width : 100%;
+        }
+        td {
+            text-align : center;
+        }
+        .thlink:link, .thlink:visited, .thlink:active {
+            color: #cfb327;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+    
+    <canvas id="tak" width="800" height="240">
+        
+    </canvas>
+    </div>
+    
+    <div id="podp">
+    
+    </div>
+    
+    <div id="fykrestu" style="display:none">
+            <canvas id="czort" width="800", height="480">
+            </canvas>
+    </div>
+    
+    <div id="histy">
+    
+    </div>
+    
+</body>
+
+
+<script src="chartjs/dist/Chart.js"></script>
+
+<script type="text/javascript">
+
+var terafyk = ""
+
+function dtos(date)
+{
+    hs = "" + date.getHours()
+    mi = "" + date.getMinutes()
+    if (hs.length == 1) hs = "0" + hs
+    if (mi.length == 1) mi = "0" + mi
+    return hs+":"+mi
+}
+
+function ftos(fval, decimalplaces = 1)
+{
+    try 
+    {
+        return fval.toFixed(decimalplaces);
+    }
+    catch (error)
+    {
+        return "-";
+    }
+}
+
+function fykresuj(text)
+{
+    var column;
+    
+    document.getElementById('czort').remove()
+    document.getElementById('fykrestu').innerHTML = "<canvas id=\"czort\" width=\"800\", height=\"480\"></canvas>"
+
+    gp = JSON.parse(text);
+    
+    labels = [];
+    dvalues = [];
+    
+    for (var i = 0; i < gp.length; ++i)
+    {
+        if (0 == i)
+        {
+            ks = Object.keys(gp[i]);
+            for (var j = 0; j < ks.length; ++j)
+            {
+                if (ks[j] != "ts" && ks[j] != "localtime")
+                {
+                    column = ks[j];
+                    break;
+                }
+            }
+        }
+    
+        var d = new Date(0)
+        d.setUTCSeconds(gp[i].ts)
+        labels.push(dtos(d))
+        dvalues.push({x:i, y:gp[i][column]})
+    }
+    
+    var ctx = document.getElementById('czort').getContext("2d");
+    var myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels : labels,
+            datasets: [{
+                label: column,
+                backgroundColor: '#fcba03',
+                borderColor: '#fcba03',
+                data: dvalues,
+                fill : false
+            }]
+        },
+        options : {
+            responsive : false
+        }
+    });
+}
+
+function fykres(column)
+{
+    var elem = document.getElementById("fykrestu")
+    var visible;
+    
+    if (elem.style.display == "block")
+    {
+        
+        visible = true;
+    }
+    else
+    {
+        visible = false;
+    }
+  
+    if (column == terafyk && visible)
+    {
+        elem.style.display = "none";
+    }
+    else
+    {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) 
+            {
+                fykresuj(this.responseText);
+            }
+        };
+        xhttp.open("GET", "/history?key=" + column, false);
+        xhttp.send();    
+    
+        terafyk = column;
+        elem.style.display = "block";
+    }
+}
+
+function histuj(text)
+{
+    txt = "<table>"
+    txt += "<tr><th><a class=\"thlink\" href=\"kszy_history.html\" >data i czas</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('temperature')\" >temperatura [ºC]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('pressure')\" >ciśnienie [hPa]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('humidity')\" >wilgotność [%]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('solar_mv')\" >napięcie baterii sł. [mV]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('pm1_0')\" >PM1.0 [µg/m3]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('pm2_5')\" >PM2.5 [µg/m3]</a></th>"
+            + "<th><a class=\"thlink\" href=\"javascript:fykres('pm10')\" >PM10 [µg/m3]</a></th></tr>"
+    gnioty = JSON.parse(text)
+    for (i = gnioty.length - 1; i >= 0; --i)
+    {
+        txt +="<tr>"
+        txt += "<td>"
+        txt += gnioty[i].localtime
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].temperature)
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].pressure, 2)
+        txt += "</td>"
+        txt += "<td>"
+        txt += ftos(gnioty[i].humidity)
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].solar_mv
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm1_0
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm2_5
+        txt += "</td>"
+        txt += "<td>"
+        txt += gnioty[i].pm10
+        txt += "</td>"
+        txt +="</tr>"
+    }
+    txt += "</table>"
+    document.getElementById("histy").innerHTML = txt
+}
+
+function ciapuj(text) 
+{
+    var c = document.getElementById("tak");
+    var ctx = c.getContext("2d");
+
+    ctx.fillStyle = "#699BDD";
+    ctx.fillRect(0, 0, 800, 240);
+
+    var gnioty = JSON.parse(text)
+    
+    // solar bar volatage meter
+    ctx.beginPath();
+    ctx.lineWidth = "5";
+    ctx.fillStyle = "#d2d547";
+    ctx.strokeStyle = "#d2d547";
+    ctx.rect(15, 30, 40, 100);
+    ctx.stroke();
+    
+    solar = gnioty.solar_mv.latest.value;
+    bars = 0;
+    if (solar > 75)
+    {
+        bars = Math.floor((solar * 7) / 1050);
+    }
+    for (i = 0; i < bars && i < 7; ++i)
+    {
+        ctx.fillRect(23, 114 - i * 13, 24, 9);
+    }
+    
+    ctx.font = "italic 11px URW Gothic"
+    ctx.fillText(solar + "mV", 15, 148)
+    
+    // measure time
+    ctx.font = "bold italic 32px Carlito"
+    var d = new Date(0)
+    d.setUTCSeconds(gnioty.temperature.latest.ts)
+    ctx.fillText(dtos(d), 700, 40)
+    
+    // temperature
+    ctx.fillStyle = "#FFFFFF"
+    ctx.font = "bold 90px URW Gothic"
+    ctx.fillText(ftos(gnioty.temperature.latest.value) + "º", 70, 120)
+    
+    ctx.font = "bold 32px URW Gothic"
+    ctx.fillText(ftos(gnioty.temperature.minimal.value) + "º", 285, 80)
+    ctx.fillText(ftos(gnioty.temperature.maximal.value) + "º", 285, 120)
+    
+    // humidity
+    ctx.font = "bold 48px URW Gothic"
+    ctx.fillText(ftos(gnioty.humidity.latest.value) + "%", 420, 70)
+    
+    ctx.font = "bold 20px URW Gothic"
+    ctx.fillText(ftos(gnioty.humidity.minimal.value) + "%", 580, 48)
+    ctx.fillText(ftos(gnioty.humidity.maximal.value) + "%", 580, 72)
+    
+    // pressure
+    ctx.font = "bold 48px URW Gothic"
+    ctx.fillText(ftos(gnioty.pressure.latest.value) + "hPa", 420, 130)
+    
+    ctx.font = "bold 20px URW Gothic"
+    ctx.fillText(ftos(gnioty.pressure.minimal.value) + "hPa", 660, 100)
+    ctx.fillText(ftos(gnioty.pressure.maximal.value) + "hPa", 660, 132)
+  
+    // smog
+    ctx.fillStyle = "#707070"
+    ctx.font = "bold 18px URW Gothic"
+    ctx.fillText("PM1.0", 20, 200)
+    ctx.fillText("PM2.5", 300, 200)
+    ctx.fillText("PM10", 560, 200)
+    
+    ctx.font = "bold 40px URW Gothic"
+    ctx.fillText(gnioty.pm1_0.latest.value, 80, 200)
+    ctx.fillText(gnioty.pm2_5.latest.value, 360, 200)
+    ctx.fillText(gnioty.pm10.latest.value,  620, 200)
+    
+    ctx.font = "bold 18px URW Gothic"
+    ctx.fillText(gnioty.pm1_0.minimal.value, 150, 180)
+    ctx.fillText(gnioty.pm1_0.maximal.value, 150, 200)
+    
+    ctx.fillText(gnioty.pm2_5.minimal.value, 430, 180)
+    ctx.fillText(gnioty.pm2_5.maximal.value, 430, 200)
+    
+    ctx.fillText(gnioty.pm10.minimal.value, 690, 180)
+    ctx.fillText(gnioty.pm10.maximal.value, 690, 200)
+    
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) 
+        {
+            histuj(this.responseText);
+        }
+    };
+    xhttp.open("GET", "/history", true);
+    xhttp.send();
+    
+    c.addEventListener('click', function(event) {
+        var elemLeft = c.offsetLeft + c.clientLeft,
+            elemTop = c.offsetTop + c.clientTop;
+        var x = event.pageX - elemLeft,
+            y = event.pageY - elemTop;
+          
+        if (x > 79 && x < 280 && y > 30 && y < 120)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar temperatury (" + ftos(gnioty.temperature.latest.value) + "ºC) - "
+                    + gnioty.temperature.latest.localtime
+        } 
+        else if (x > 285 && x < 390 && y > 40 && y < 80)
+        {
+            document.getElementById("podp").innerHTML = "Minimalna dobowa temperatura (" + ftos(gnioty.temperature.minimal.value) + "ºC) - "
+                    + gnioty.temperature.minimal.localtime
+        }
+        else if (x > 285 && x < 390 && y > 80 && y < 120)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalna dobowa temperatura (" + ftos(gnioty.temperature.maximal.value) + "ºC) - "
+                    + gnioty.temperature.maximal.localtime
+        }
+        else if (x > 420 && x < 570 && y > 35 && y < 70)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar wilgotności względnej (" + ftos(gnioty.humidity.latest.value) + "%) - "
+                    + gnioty.humidity.latest.localtime
+        }
+        else if (x > 580 && x < 660 && y > 20 && y < 48)
+        {
+            document.getElementById("podp").innerHTML = "Minimalna dobowa wilgotność (" + ftos(gnioty.humidity.minimal.value) + "%) - "
+                    + gnioty.humidity.minimal.localtime
+        }
+        else if (x > 580 && x < 660 && y > 48 && y < 72)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalna dobowa wilgotność (" + ftos(gnioty.humidity.maximal.value) + "%) - "
+                    + gnioty.humidity.maximal.localtime
+        }
+        else if (x > 420 && x < 650 && y > 95 && y < 130)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar ciśnienia atmosferycznego (" + ftos(gnioty.pressure.latest.value) + "hPa) - "
+                    + gnioty.pressure.latest.localtime
+        }
+        else if (x > 660 && x < 750 && y > 70 && y < 100)
+        {
+            document.getElementById("podp").innerHTML = "Minimalne dobowe ciśnienie (" + ftos(gnioty.pressure.minimal.value) + "hPa) - "
+                    + gnioty.pressure.minimal.localtime
+        }
+        else if (x > 660 && x < 750 && y > 100 && y < 132)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalne dobowe ciśnienie (" + ftos(gnioty.pressure.maximal.value) + "hPa) - "
+                    + gnioty.pressure.maximal.localtime
+        }
+        else if (x > 20 && x < 130 && y > 160 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar stężenia cząstek zawieszonych PM1.0 (" + gnioty.pm1_0.latest.value + "µg/m3) - "
+                    + gnioty.pm1_0.latest.localtime
+        }
+        else if (x > 150 && x < 200 && y > 160 && y < 180)
+        {
+            document.getElementById("podp").innerHTML = "Minimalne dobowe stężenie PM1.0 (" + gnioty.pm1_0.minimal.value + "µg/m3) - "
+                    + gnioty.pm1_0.minimal.localtime
+        }
+        else if (x > 150 && x < 200 && y > 180 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalne dobowe stężenie PM1.0 (" + gnioty.pm1_0.maximal.value + "µg/m3) - "
+                    + gnioty.pm1_0.maximal.localtime
+        }
+        else if (x > 300 && x < 410 && y > 160 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar stężenia cząstek zawieszonych PM2.5 (" + gnioty.pm2_5.latest.value + "µg/m3) - "
+                    + gnioty.pm2_5.latest.localtime
+        }
+        else if (x > 430 && x < 480 && y > 160 && y < 180)
+        {
+            document.getElementById("podp").innerHTML = "Minimalne dobowe stężenie PM2.5 (" + gnioty.pm2_5.minimal.value + "µg/m3) - "
+                    + gnioty.pm2_5.minimal.localtime
+        }
+        else if (x > 430 && x < 480 && y > 180 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalne dobowe stężenie PM2.5 (" + gnioty.pm2_5.maximal.value + "µg/m3) - "
+                    + gnioty.pm2_5.maximal.localtime
+        }
+        else if (x > 560 && x < 670 && y > 160 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Pomiar stężenia cząstek zawieszonych PM10 (" + gnioty.pm10.latest.value + "µg/m3) - "
+                    + gnioty.pm10.latest.localtime
+        }
+        else if (x > 690 && x < 740 && y > 160 && y < 180)
+        {
+            document.getElementById("podp").innerHTML = "Minimalne dobowe stężenie PM10 (" + gnioty.pm10.minimal.value + "µg/m3) - "
+                    + gnioty.pm10.minimal.localtime
+        }
+        else if (x > 690 && x < 740 && y > 180 && y < 200)
+        {
+            document.getElementById("podp").innerHTML = "Maksymalne dobowe stężenie PM10 (" + gnioty.pm10.maximal.value + "µg/m3) - "
+                    + gnioty.pm10.maximal.localtime
+        }
+        else if (x > 15 && x < 55 && y > 40 && y < 148)
+        {
+            document.getElementById("podp").innerHTML = "Napięcie baterii słonecznej: teraz - " + gnioty.solar_mv.latest.value + "mV, maksymalne dobowe - "
+                    + gnioty.solar_mv.maximal.value + "mV - " + gnioty.solar_mv.maximal.localtime;
+        }
+        else if (x > 700 && x < 780 && y > 20 && y < 40)
+        {
+            document.getElementById("podp").innerHTML = "Ostatni pomiar: " + gnioty.temperature.latest.localtime + ". Maksymalne i minimalne wartości liczone z ostatnich 24 godzin.";
+        }
+        else
+        {
+            document.getElementById("podp").innerHTML = "";
+        }
+        
+    } , false);
+}
+
+function loadMeasurements() 
+{
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (this.readyState == 4 && this.status == 200) 
+        {
+            ciapuj(this.responseText);
+        }
+    };
+    xhttp.open("GET", "/teraz", true);
+    xhttp.send();
+}
+
+setTimeout(loadMeasurements, 500);
+setInterval(loadMeasurements, 30000);
+</script>
+
+</html>
